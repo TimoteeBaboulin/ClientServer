@@ -8,10 +8,14 @@ public class Bullet : NetworkBehaviour{
     }
 
     private void OnTriggerEnter(Collider other){
-        Debug.Log("Collision");
+        if (!IsServer) return;
+
+        IEntity entity = other.GetComponent<IEntity>();
+        if (entity is{Team: Team.Zombie})
+            entity.TakeDamageClientRpc(1);
+        
         Rigidbody rbody = other.GetComponent<Rigidbody>();
         if (rbody != null){
-            Debug.Log("Rigidbody found");
             rbody.AddForce(transform.forward, ForceMode.Impulse);
         }
         Destroy(gameObject);

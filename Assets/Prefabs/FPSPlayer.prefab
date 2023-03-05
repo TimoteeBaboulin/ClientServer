@@ -13,6 +13,7 @@ GameObject:
   - component: {fileID: 7286488518784625494}
   - component: {fileID: 8855478606057343660}
   - component: {fileID: 943674790275562822}
+  - component: {fileID: 696856334582341134}
   m_Layer: 0
   m_Name: FPSPlayer
   m_TagString: Untagged
@@ -71,7 +72,9 @@ MonoBehaviour:
   _cannon: {fileID: 1984723312348522248}
   _bullet: {fileID: 8753335957044865974, guid: 400d5ccf890180542872adefa521eeac, type: 3}
   _speed: 15
-  _mouseSpeed: 100
+  _mouseSpeed: 1000
+  _maxHealth: 10
+  _currentHealth: 10
 --- !u!114 &8855478606057343660
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -114,6 +117,20 @@ MonoBehaviour:
   AlwaysReplicateAsRoot: 0
   DontDestroyWithOwner: 0
   AutoObjectParentSync: 1
+--- !u!136 &696856334582341134
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 614951600231277889}
+  m_Material: {fileID: 0}
+  m_IsTrigger: 0
+  m_Enabled: 1
+  m_Radius: 0.75
+  m_Height: 2
+  m_Direction: 1
+  m_Center: {x: 0, y: 1, z: 0}
 --- !u!1 &2972340589636570402
 GameObject:
   m_ObjectHideFlags: 0
