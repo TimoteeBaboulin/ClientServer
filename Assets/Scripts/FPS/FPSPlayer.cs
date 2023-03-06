@@ -22,6 +22,7 @@ public class FPSPlayer : NetworkBehaviour, IEntity{
     [SerializeField] private int _currentHealth;
     
     private CharacterController _controller;
+    private float _nextShotAt;
 
     public override void OnNetworkSpawn(){
         if (!IsOwner){
@@ -30,23 +31,23 @@ public class FPSPlayer : NetworkBehaviour, IEntity{
             Cursor.lockState = CursorLockMode.Locked;
             Cursor.visible = false;
         }
+        else
+            RespawnServerRpc();
+        
         
         Players.Add(this);
         base.OnNetworkSpawn();
     }
 
     private void Awake(){
+        if (!IsOwner) Debug.Log("Thief!");
         _controller = GetComponent<CharacterController>();
         transform.position = Vector3.zero;
     }
 
-    private void OnEnable(){
-        RespawnServerRpc();
-    }
-
     private void Update(){
-        if (!IsOwner || IsServer) return;
-        
+        if (!IsOwner) return;
+
         Vector3 movement = transform.forward * Input.GetAxis("Vertical") + transform.right * Input.GetAxis("Horizontal");
         movement.y = 0;
         _controller.Move(movement.normalized * (Time.deltaTime * _speed));
@@ -56,13 +57,14 @@ public class FPSPlayer : NetworkBehaviour, IEntity{
             Cursor.lockState = CursorLockMode.None;
         }
         
-        if (Input.GetButtonDown("Fire1")){
+        if (Input.GetButton("Fire1")){
             if (Cursor.visible || Cursor.lockState != CursorLockMode.Locked){
                 Cursor.visible = false;
                 Cursor.lockState = CursorLockMode.Locked;
             }
             
             ShootServerRpc(_cannon.position, _cannon.rotation);
+            _nextShotAt = Time.time + 0.2f;
         }
         
         if (Cursor.visible == false){
@@ -72,26 +74,12 @@ public class FPSPlayer : NetworkBehaviour, IEntity{
         }
     }
 
-    [ClientRpc]
-    void ShootClientRpc(){
-        Debug.Log("Shoot");
-        ShootServerRpc(_cannon.position, _cannon.rotation);
-    }
-
     [ServerRpc]
     void ShootServerRpc(Vector3 position, Quaternion rotation){
-        Debug.Log("Shoot procedure called");
-        if (!IsServer)
-            return;
-        
         GameObject bullet = Instantiate(_bullet, position, rotation);
         bullet.GetComponent<NetworkObject>().Spawn();
     }
 
-    private void Shoot(){
-        Instantiate(_bullet, _cannon.position, _cannon.rotation);
-    }
-    
     public override void OnNetworkDespawn(){
         if (IsOwner && !IsServer){
             Debug.Log("I despawned");
@@ -107,22 +95,27 @@ public class FPSPlayer : NetworkBehaviour, IEntity{
     }
     
     public void TakeDamage(int damage){
-        if (!IsServer) return;
+        if (!IsOwner){
+            return;
+        }
 
+        TakeDamageServerRpc(damage);
+    }
+
+    [ServerRpc]
+    public void TakeDamageServerRpc(int damage){
         _currentHealth -= damage;
-        if (_currentHealth<= 0)
+        if (_currentHealth <= 0)
             Die();
     }
 
-    [ClientRpc]
-    public void TakeDamageClientRpc(int damage){
-        _currentHealth -= damage;
-    }
-
     public void Die(){
-        if (!IsServer) return;
-        gameObject.SetActive(false);
+        if (!IsOwner && !IsServer) return;
+        if (IsServer) Debug.Log("Die");
+        
+        DieClientRpc();
         Invoke(nameof(Respawn), 2);
+        gameObject.SetActive(false);
     }
 
     [ClientRpc]
@@ -131,15 +124,22 @@ public class FPSPlayer : NetworkBehaviour, IEntity{
     }
 
     private void Respawn(){
+        Debug.Log("Respawn");
+        if (!IsServer) return;
+        
         gameObject.SetActive(true);
         _currentHealth = _maxHealth;
         SetActiveClientRpc();
         OnRespawn?.Invoke(this);
     }
-
+    
     [ServerRpc]
     private void RespawnServerRpc(){
-        Respawn();
+        Debug.Log("RespawnServerRpc");
+        gameObject.SetActive(true);
+        _currentHealth = _maxHealth;
+        SetActiveClientRpc();
+        OnRespawn?.Invoke(this);
     }
     
     [ClientRpc]

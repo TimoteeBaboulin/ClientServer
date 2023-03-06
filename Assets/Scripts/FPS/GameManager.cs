@@ -12,8 +12,6 @@ public class GameManager : NetworkBehaviour{
     private void Awake(){
         if (Instance != null) Destroy(this);
         Instance = this;
-
-        if (!IsServer) return;
         
         FPSPlayer.OnRespawn += SpawnPlayer;
     }
@@ -22,11 +20,8 @@ public class GameManager : NetworkBehaviour{
         FPSPlayer.OnRespawn -= SpawnPlayer;
     }
     
-    private void SpawnPlayer (FPSPlayer player)
-    {
-        Debug.Log("Spawn Player");
+    private void SpawnPlayer (FPSPlayer player){
         if (!IsServer) return;
-        
 
         ClientRpcParams rpcParams = new ClientRpcParams{
             Send = new ClientRpcSendParams{
