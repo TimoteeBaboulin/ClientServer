@@ -3,6 +3,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using Unity.Collections;
+using Unity.Collections.LowLevel.Unsafe;
 using Unity.Netcode;
 using UnityEngine;
 using Random = UnityEngine.Random;
@@ -57,6 +58,16 @@ public abstract class NetworkDiscovery : MonoBehaviour{
         _ = ListenAsync(isServer ? ReceiveBroadcastAsync : ReceiveResponseAsync);
         IsRunning = true;
     }
+
+    public void ClientBroadcast(){
+        IPEndPoint endPoint = new IPEndPoint(IPAddress.Broadcast, _port);
+
+        using FastBufferWriter writer = new FastBufferWriter(1024, Allocator.Temp, 1024 * 64);
+        
+        WriteHeader(writer, MessageType.Broadcast);
+        var data = writer.ToArray();
+        _client.SendAsync(data, data.Length, endPoint);
+    }
     
     async Task ListenAsync(Func<Task> onReceiveTask){
         while (true){
@@ -79,8 +90,8 @@ public abstract class NetworkDiscovery : MonoBehaviour{
         using var reader = new FastBufferReader(segment, Allocator.Temp);
 
         //Si ce n'est pas une réponse ou que ca ne vient pas de notre application
-        if (ReadAndCheckHeader(reader, MessageType.Response)) return;
-        
+        if (!ReadAndCheckHeader(reader, MessageType.Response)) return;
+
         reader.ReadNetworkSerializable(out NetworkData networkData);
         ResponseReceived(receiveResult.RemoteEndPoint, networkData);
     }
@@ -96,7 +107,12 @@ public abstract class NetworkDiscovery : MonoBehaviour{
         NetworkData response = GetServerData();
         writer.WriteNetworkSerializable(response);
         var data = writer.ToArray();
-        await _client.SendAsync(data, data.Length, receiveResult.RemoteEndPoint);
+        try{
+            await _client.SendAsync(data, data.Length, receiveResult.RemoteEndPoint);
+        }
+        catch (Exception e){
+            Console.WriteLine(e);
+        }
     }
 
     private void WriteHeader(FastBufferWriter writer, MessageType type){
@@ -105,6 +121,7 @@ public abstract class NetworkDiscovery : MonoBehaviour{
     }
 
     private bool ReadAndCheckHeader(FastBufferReader reader, MessageType expectedType){
+        
         reader.ReadValueSafe(out long receivedId);
         if (receivedId != _uniqueApplicationId) return false;
         

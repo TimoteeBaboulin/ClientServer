@@ -40,7 +40,6 @@ public class FPSPlayer : NetworkBehaviour, IEntity{
     }
 
     private void Awake(){
-        if (!IsOwner) Debug.Log("Thief!");
         _controller = GetComponent<CharacterController>();
         transform.position = Vector3.zero;
     }
@@ -84,6 +83,8 @@ public class FPSPlayer : NetworkBehaviour, IEntity{
         if (IsOwner && !IsServer){
             Debug.Log("I despawned");
         }
+
+        Players.Remove(this);
         base.OnNetworkDespawn();
     }
 
@@ -111,8 +112,7 @@ public class FPSPlayer : NetworkBehaviour, IEntity{
 
     public void Die(){
         if (!IsOwner && !IsServer) return;
-        if (IsServer) Debug.Log("Die");
-        
+
         DieClientRpc();
         Invoke(nameof(Respawn), 2);
         gameObject.SetActive(false);
@@ -124,7 +124,6 @@ public class FPSPlayer : NetworkBehaviour, IEntity{
     }
 
     private void Respawn(){
-        Debug.Log("Respawn");
         if (!IsServer) return;
         
         gameObject.SetActive(true);
@@ -135,7 +134,6 @@ public class FPSPlayer : NetworkBehaviour, IEntity{
     
     [ServerRpc]
     private void RespawnServerRpc(){
-        Debug.Log("RespawnServerRpc");
         gameObject.SetActive(true);
         _currentHealth = _maxHealth;
         SetActiveClientRpc();

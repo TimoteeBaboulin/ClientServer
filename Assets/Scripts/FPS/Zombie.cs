@@ -32,7 +32,6 @@ public class Zombie : NetworkBehaviour, IEntity{
         IEntity entity = other.GetComponent<IEntity>();
 
         if (entity != null && entity.NetworkObject.IsOwner && entity.Team != Team){
-            Debug.Log("Zombie");
             entity.TakeDamage(1);
         }
     }
