@@ -1,9 +1,12 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 using System.Net.Sockets;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using TMPro;
+using Unity.Collections;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
 using Unity.Services.Authentication;
@@ -44,12 +47,48 @@ namespace FPS.Connection.Online{
         //Lobby functions
         public async void CreateLobby(){
             _currentLobby = await LobbyService.Instance.CreateLobbyAsync(LobbyName, LobbyMaxPlayer, LobbyOptions);
-            // _allocation = await RelayService.Instance.CreateAllocationAsync(LobbyMaxPlayer);
-            // _transport.ConnectionData.Address = _allocation.RelayServer.IpV4;
-            // _transport.ConnectionData.Port = (ushort)_allocation.RelayServer.Port;
-            // _client = new UdpClient();
-            //
-            // using var writer = new FastBufferWriter();
+            _allocation = await RelayService.Instance.CreateAllocationAsync(LobbyMaxPlayer);
+            Debug.Log(_allocation.RelayServer.IpV4);
+            _transport.ConnectionData.Address = _allocation.RelayServer.IpV4;
+            _transport.ConnectionData.Port = (ushort)_allocation.RelayServer.Port;
+            _client = new UdpClient();
+
+            byte[] data;
+            
+            using (var writer = new FastBufferWriter(1024, Allocator.Temp, 1024*64)){
+                //Header
+                writer.TryBeginWrite(72 + _allocation.ConnectionData.Length);
+                Debug.Log(41 + _allocation.ConnectionData.Length);
+                writer.WriteValue((ushort)0xDA72);
+                writer.WriteByte(0);
+                writer.WriteByte(0);
+                Debug.Log(writer.Length);
+                Debug.Log("Header Ending");
+
+                writer.WriteByte(0);
+                writer.WriteValue(_nonce);
+                _nonce++;
+                writer.WriteByte((byte) _allocation.ConnectionData.Length);
+                Debug.Log("connectionData length: " + _allocation.ConnectionData.Length);
+                
+                writer.WriteBytes(_allocation.ConnectionData);
+                Debug.Log(writer.Length);
+                Debug.Log(writer.Length + _allocation.Key.Length);
+                
+                writer.WriteBytes(_allocation.Key);
+
+
+                Debug.Log(writer.Length);
+                
+
+
+                data = writer.ToArray();
+            }
+            
+            _ = ListenForMessages();
+
+            IPAddress.TryParse(_allocation.RelayServer.IpV4, out var address);
+            await _client.SendAsync(data, data.Length, new IPEndPoint(address, _allocation.RelayServer.Port));
             //
             // writer.WriteByteSafe((byte[])0xDA72);
             // AuthenticationService.Instance.
@@ -134,6 +173,35 @@ namespace FPS.Connection.Online{
             Debug.Log(LocalPlayer.Data);
             
             LobbyOptions.Player = LocalPlayer;
+        }
+
+        private async Task ListenForMessages(){
+            Debug.Log("Listening");
+            while (true){
+                Debug.Log("Listening");
+                try{
+                    await ReceiveMessage();
+                }
+                catch (ObjectDisposedException e){
+                    Console.WriteLine(e);
+                }
+                catch (Exception e){
+                    Console.WriteLine(e);
+                    throw;
+                }
+                
+            }
+        }
+
+        private async Task ReceiveMessage(){
+            UdpReceiveResult result = await _client.ReceiveAsync();
+            
+            var segment = new ArraySegment<byte>(result.Buffer, 0, result.Buffer.Length);
+            using var reader = new FastBufferReader(segment, Allocator.Temp);
+            
+            UInt16 value;
+            reader.ReadValueSafe(out value);
+            Debug.Log(value);
         }
     }
 

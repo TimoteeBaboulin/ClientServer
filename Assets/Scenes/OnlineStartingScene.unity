@@ -618,6 +618,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _maxNameLength: 32
   _maxLobbySize: 16
+  _transport: {fileID: 1350808724}
   _uiReferences:
     LobbyScreen: {fileID: 1617259409}
     MainScreen: {fileID: 1326779381}
