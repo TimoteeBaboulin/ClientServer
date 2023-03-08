@@ -3,12 +3,12 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading.Tasks;
 using Unity.Collections;
-using Unity.Collections.LowLevel.Unsafe;
 using Unity.Netcode;
 using UnityEngine;
 using Random = UnityEngine.Random;
 
-public abstract class NetworkDiscovery : MonoBehaviour{
+public abstract class NetworkDiscovery<TResponse> : MonoBehaviour
+    where TResponse : INetworkSerializable, new() {
     [SerializeField] private long _uniqueApplicationId;
     [SerializeField] private ushort _port = 47777;
 
@@ -80,8 +80,8 @@ public abstract class NetworkDiscovery : MonoBehaviour{
         }
     }
     
-    protected abstract NetworkData GetServerData();
-    protected abstract void ResponseReceived(IPEndPoint sender, NetworkData serverData);
+    protected abstract TResponse GetServerData();
+    protected abstract void ResponseReceived(IPEndPoint sender, TResponse serverData);
     
     async Task ReceiveResponseAsync(){
         UdpReceiveResult receiveResult = await _client.ReceiveAsync();
@@ -92,7 +92,7 @@ public abstract class NetworkDiscovery : MonoBehaviour{
         //Si ce n'est pas une réponse ou que ca ne vient pas de notre application
         if (!ReadAndCheckHeader(reader, MessageType.Response)) return;
 
-        reader.ReadNetworkSerializable(out NetworkData networkData);
+        reader.ReadNetworkSerializable(out TResponse networkData);
         ResponseReceived(receiveResult.RemoteEndPoint, networkData);
     }
     async Task ReceiveBroadcastAsync(){
@@ -104,7 +104,7 @@ public abstract class NetworkDiscovery : MonoBehaviour{
         using var writer = new FastBufferWriter(1024, Allocator.Temp, 1024 * 64);
         WriteHeader(writer, MessageType.Response);
 
-        NetworkData response = GetServerData();
+        TResponse response = GetServerData();
         writer.WriteNetworkSerializable(response);
         var data = writer.ToArray();
         try{
@@ -137,5 +137,17 @@ public struct NetworkData : INetworkSerializable{
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter{
         serializer.SerializeValue(ref Port);
         serializer.SerializeValue(ref ServerName);
+    }
+}
+
+public struct OnlineLobbyData : INetworkSerializable{
+    public string LobbyName;
+    public int MaxPlayers;
+    public bool IsPublic;
+
+    public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter{
+        serializer.SerializeValue(ref LobbyName);
+        serializer.SerializeValue(ref MaxPlayers);
+        serializer.SerializeValue(ref IsPublic);
     }
 }

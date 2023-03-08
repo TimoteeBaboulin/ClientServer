@@ -8,7 +8,7 @@ using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-public class Discovery : NetworkDiscovery{
+public class Discovery : NetworkDiscovery<NetworkData>{
     [SerializeField] private NetworkManager _networkManager;
     [SerializeField] private UnityTransport _transport;
 

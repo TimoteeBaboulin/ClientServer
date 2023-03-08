@@ -2,7 +2,7 @@ using Unity.Netcode;
 using UnityEditor;
 using UnityEngine;
 
-public class Player : NetworkBehaviour{
+public class DeprecatedPlayer : NetworkBehaviour{
     public int PlayerID;
     private PlayerData _playerData;
     
@@ -32,7 +32,7 @@ public class Player : NetworkBehaviour{
 }
 
 public static class LocalPlayerManager{
-    public static Player LocalPlayer;
+    public static DeprecatedPlayer LocalPlayer;
 }
 
 public struct PlayerData{
