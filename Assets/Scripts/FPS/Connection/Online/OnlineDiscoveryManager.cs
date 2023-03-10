@@ -9,12 +9,15 @@ using TMPro;
 using Unity.Collections;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
+using Unity.Networking.Transport;
+using Unity.Networking.Transport.Relay;
 using Unity.Services.Authentication;
 using Unity.Services.Core;
 using Unity.Services.Lobbies;
 using Unity.Services.Lobbies.Models;
 using Unity.Services.Relay;
 using Unity.Services.Relay.Models;
+using Unity.VisualScripting;
 using UnityEngine;
 using Player = Unity.Services.Lobbies.Models.Player;
 using Toggle = UnityEngine.UI.Toggle;
@@ -41,6 +44,9 @@ namespace FPS.Connection.Online{
         private UdpClient _client;
         private UInt16 _nonce = 0;
 
+        private NetworkDriver _driver;
+        private NetworkEndPoint _networkEndPoint;
+
         public Lobby CurrentLobby => _currentLobby;
         private Lobby _currentLobby;
 
@@ -51,54 +57,48 @@ namespace FPS.Connection.Online{
             Debug.Log(_allocation.RelayServer.IpV4);
             _transport.ConnectionData.Address = _allocation.RelayServer.IpV4;
             _transport.ConnectionData.Port = (ushort)_allocation.RelayServer.Port;
+            _driver = NetworkDriver.Create();
+            long.TryParse(_allocation.RelayServer.IpV4, out long address);
+            
+            var endPoint = new IPEndPoint(address, _allocation.RelayServer.Port);
+            NetworkEndPoint.TryParse(_allocation.RelayServer.IpV4, (ushort)_allocation.RelayServer.Port, out _networkEndPoint);
+            Debug.Log(_driver.Connect(_networkEndPoint));
+            Debug.Log(_driver.Listen());
+            
             _client = new UdpClient();
 
-            byte[] data;
-            
             using (var writer = new FastBufferWriter(1024, Allocator.Temp, 1024*64)){
-                //Header
-                writer.TryBeginWrite(72 + _allocation.ConnectionData.Length);
-                Debug.Log(41 + _allocation.ConnectionData.Length);
-                writer.WriteValue((ushort)0xDA72);
-                writer.WriteByte(0);
-                writer.WriteByte(0);
-                Debug.Log(writer.Length);
-                Debug.Log("Header Ending");
-
-                writer.WriteByte(0);
-                writer.WriteValue(_nonce);
-                _nonce++;
-                writer.WriteByte((byte) _allocation.ConnectionData.Length);
-                Debug.Log("connectionData length: " + _allocation.ConnectionData.Length);
-                
-                writer.WriteBytes(_allocation.ConnectionData);
-                Debug.Log(writer.Length);
-                Debug.Log(writer.Length + _allocation.Key.Length);
-                
-                writer.WriteBytes(_allocation.Key);
-
-
-                Debug.Log(writer.Length);
-                
-
-
-                data = writer.ToArray();
+                // //Header
+                // writer.TryBeginWrite(72 + _allocation.ConnectionData.Length);
+                // Debug.Log(41 + _allocation.ConnectionData.Length);
+                // writer.WriteValue((ushort)0xDA72);
+                // writer.WriteByte(0);
+                // writer.WriteByte(0);
+                // Debug.Log(writer.Length);
+                // Debug.Log("Header Ending");
+                //
+                // writer.WriteByte(0);
+                // writer.WriteValue(_nonce);
+                // _nonce++;
+                // writer.WriteByte((byte) _allocation.ConnectionData.Length);
+                // Debug.Log("connectionData length: " + _allocation.ConnectionData.Length);
+                //
+                // writer.WriteBytes(_allocation.ConnectionData);
+                // Debug.Log(writer.Length);
+                // Debug.Log(writer.Length + _allocation.Key.Length);
+                //
+                // writer.WriteBytes(_allocation.Key);
+                //
+                //
+                // Debug.Log(writer.Length);
             }
-            
-            _ = ListenForMessages();
+            Task listener = ListenForMessages();
+            await listener;
 
-            IPAddress.TryParse(_allocation.RelayServer.IpV4, out var address);
-            await _client.SendAsync(data, data.Length, new IPEndPoint(address, _allocation.RelayServer.Port));
-            //
-            // writer.WriteByteSafe((byte[])0xDA72);
-            // AuthenticationService.Instance.
-            // Byte[]
-            // _client.SendAsync()
-            //
-            // _allocation
-            
             Debug.Log(_currentLobby.Id);
-            
+        }
+
+        public void HostToLobbyScreen(){
             _uiReferences.HostScreen.SetActive(false);
             _uiReferences.LobbyScreen.SetActive(true);
         }
@@ -176,9 +176,13 @@ namespace FPS.Connection.Online{
         }
 
         private async Task ListenForMessages(){
-            Debug.Log("Listening");
+            bool running = true;
+            var timer = new System.Timers.Timer(10000);
+            timer.Elapsed += ((sender, args) => { running = false; });
+            timer.Start();
+            
             while (true){
-                Debug.Log("Listening");
+                
                 try{
                     await ReceiveMessage();
                 }
@@ -194,7 +198,16 @@ namespace FPS.Connection.Online{
         }
 
         private async Task ReceiveMessage(){
-            UdpReceiveResult result = await _client.ReceiveAsync();
+            UdpReceiveResult result;
+            Debug.Log("Receive Message");
+            try{
+                result = await _client.ReceiveAsync();
+            }
+            catch (Exception e){
+                Console.WriteLine(e);
+                throw;
+            }
+            
             
             var segment = new ArraySegment<byte>(result.Buffer, 0, result.Buffer.Length);
             using var reader = new FastBufferReader(segment, Allocator.Temp);
@@ -202,6 +215,8 @@ namespace FPS.Connection.Online{
             UInt16 value;
             reader.ReadValueSafe(out value);
             Debug.Log(value);
+            if (value != 0)
+                HostToLobbyScreen();
         }
     }
 
