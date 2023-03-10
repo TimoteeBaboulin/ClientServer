@@ -1,7 +1,9 @@
-﻿using Unity.Netcode;
+﻿using System;
+using Unity.Netcode;
 using UnityEngine;
 
 public class Bullet : NetworkBehaviour{
+    [SerializeField] private static int _numberOfBullets;
     [SerializeField] private float _speed;
     private float _timeOfDeath;
 
@@ -9,10 +11,23 @@ public class Bullet : NetworkBehaviour{
         _timeOfDeath = Time.time + 3;
     }
 
+    [ContextMenu("BulletCount")]
+    public void DebugBulletCount(){
+        Debug.Log(_numberOfBullets);
+    }
+    
+    private void Start(){
+        _numberOfBullets++;
+    }
+
+    private void OnDisable(){
+        _numberOfBullets--;
+    }
+
     private void Update(){
         transform.position += transform.forward * (Time.deltaTime * _speed);
-        if (Time.time > _timeOfDeath && IsServer)
-            NetworkObject.Despawn();
+        // if (Time.time > _timeOfDeath && IsServer)
+        //     NetworkObject.Despawn();
     }
 
     private void OnTriggerEnter(Collider other){

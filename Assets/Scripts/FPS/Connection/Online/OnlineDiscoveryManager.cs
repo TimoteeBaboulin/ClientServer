@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
@@ -52,50 +53,31 @@ namespace FPS.Connection.Online{
 
         //Lobby functions
         public async void CreateLobby(){
-            _currentLobby = await LobbyService.Instance.CreateLobbyAsync(LobbyName, LobbyMaxPlayer, LobbyOptions);
-            _allocation = await RelayService.Instance.CreateAllocationAsync(LobbyMaxPlayer);
-            Debug.Log(_allocation.RelayServer.IpV4);
-            _transport.ConnectionData.Address = _allocation.RelayServer.IpV4;
-            _transport.ConnectionData.Port = (ushort)_allocation.RelayServer.Port;
-            _driver = NetworkDriver.Create();
-            long.TryParse(_allocation.RelayServer.IpV4, out long address);
             
-            var endPoint = new IPEndPoint(address, _allocation.RelayServer.Port);
-            NetworkEndPoint.TryParse(_allocation.RelayServer.IpV4, (ushort)_allocation.RelayServer.Port, out _networkEndPoint);
-            Debug.Log(_driver.Connect(_networkEndPoint));
-            Debug.Log(_driver.Listen());
-            
-            _client = new UdpClient();
+            try{
+                string joinCode;
+                _allocation = await RelayService.Instance.CreateAllocationAsync(LobbyMaxPlayer - 1);
+                // RelayServerData data = new RelayServerData(_allocation, );
+                // _transport.SetRelayServerData(_allocation.RelayServer.);
 
-            using (var writer = new FastBufferWriter(1024, Allocator.Temp, 1024*64)){
-                // //Header
-                // writer.TryBeginWrite(72 + _allocation.ConnectionData.Length);
-                // Debug.Log(41 + _allocation.ConnectionData.Length);
-                // writer.WriteValue((ushort)0xDA72);
-                // writer.WriteByte(0);
-                // writer.WriteByte(0);
-                // Debug.Log(writer.Length);
-                // Debug.Log("Header Ending");
-                //
-                // writer.WriteByte(0);
-                // writer.WriteValue(_nonce);
-                // _nonce++;
-                // writer.WriteByte((byte) _allocation.ConnectionData.Length);
-                // Debug.Log("connectionData length: " + _allocation.ConnectionData.Length);
-                //
-                // writer.WriteBytes(_allocation.ConnectionData);
-                // Debug.Log(writer.Length);
-                // Debug.Log(writer.Length + _allocation.Key.Length);
-                //
-                // writer.WriteBytes(_allocation.Key);
-                //
-                //
-                // Debug.Log(writer.Length);
+                joinCode = await RelayService.Instance.GetJoinCodeAsync(_allocation.AllocationId);
+                
+                LobbyOptions.Data = new();
+                LobbyOptions.Data.Add("Relay Join Code", new DataObject(DataObject.VisibilityOptions.Public, joinCode));
+                _currentLobby = await LobbyService.Instance.CreateLobbyAsync(LobbyName, LobbyMaxPlayer, LobbyOptions);
+                Debug.Log(joinCode);
             }
-            Task listener = ListenForMessages();
-            await listener;
+            catch (Exception e){
+                Console.WriteLine(e);
+                throw;
+            }
+            HostToLobbyScreen();
+        }
 
-            Debug.Log(_currentLobby.Id);
+        public IEnumerator PingRelayServerCoroutine(){
+            while (true){
+                yield break;
+            }
         }
 
         public void HostToLobbyScreen(){
@@ -104,7 +86,26 @@ namespace FPS.Connection.Online{
         }
 
         public async void DirectConnect(){
-            _currentLobby = await LobbyService.Instance.JoinLobbyByCodeAsync(_lobbyCode);
+            try{
+                _currentLobby = await LobbyService.Instance.JoinLobbyByCodeAsync(_lobbyCode);
+                string joinCode;
+                if (_currentLobby.Data.TryGetValue("Relay Join Code", out var data)){
+                    joinCode = data.Value;
+                    Debug.Log(joinCode + "    " + joinCode.Length);
+                    await RelayService.Instance.JoinAllocationAsync(joinCode);
+                }
+                else{
+                    Debug.Log("couldn't find Data");
+                }
+                
+            }
+            catch (Exception e){
+                Debug.LogException(e);
+                throw;
+            }
+            
+            
+            
             
             _uiReferences.ConnectScreen.SetActive(false);
             _uiReferences.LobbyScreen.SetActive(true);
